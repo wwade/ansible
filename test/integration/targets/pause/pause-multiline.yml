@@ -1,0 +1,26 @@
+- name: Test pause multiline input
+  hosts: localhost
+  become: no
+  gather_facts: no
+
+  tasks:
+    - pause:
+        echo: no
+        prompt: Enter some text
+        multiline: yes
+      register: results
+
+    - name: Ensure that input was captured
+      assert:
+        that:
+          - results.user_input == 'first line\rsecond line\rthird line\r\rfifth line'
+
+    - pause:
+        echo: yes
+        multiline: yes
+      register: results
+
+    - name: Ensure that input was captured
+      assert:
+        that:
+          - results.user_input == 'from\rdefault\rprompt'

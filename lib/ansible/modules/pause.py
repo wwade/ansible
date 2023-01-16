@@ -29,6 +29,12 @@ options:
   prompt:
     description:
       - Optional text to use for the prompt message.
+  multiline:
+    description:
+      - Read multiple lines of input before finishing with two new lines.
+    type: bool
+    default: 'no'
+    version_added: 2.14.2
   echo:
     description:
       - Controls whether or not keyboard input is shown when typing.
@@ -80,6 +86,12 @@ EXAMPLES = '''
 - name: Pause to get some sensitive input
   ansible.builtin.pause:
     prompt: "Enter a secret"
+    echo: no
+
+- name: Pause to read a multiline string
+  ansible.builtin.pause:
+    prompt: "Enter your SSH private key"
+    multiline: yes
     echo: no
 '''
 

@@ -121,6 +121,7 @@ class ActionModule(ActionBase):
         validation_result, new_module_args = self.validate_argument_spec(
             argument_spec={
                 'echo': {'type': 'bool', 'default': True},
+                'multiline': {'type': 'bool', 'default': False},
                 'minutes': {'type': int},  # Don't break backwards compat, allow floats, by using int callable
                 'seconds': {'type': int},  # Don't break backwards compat, allow floats, by using int callable
                 'prompt': {'type': 'str'},
@@ -134,6 +135,7 @@ class ActionModule(ActionBase):
         prompt = None
         seconds = None
         echo = new_module_args['echo']
+        multiline = new_module_args['multiline']
         echo_prompt = ''
         result.update(dict(
             changed=False,
@@ -150,11 +152,14 @@ class ActionModule(ActionBase):
         if not echo:
             echo_prompt = ' (output is hidden)'
 
+        multiline_info = ''
+        if multiline:
+            multiline_info = 'NOTE: Reading multiple lines of input. Use Ctrl+D or EOF to finish.\n'
+
+        promptString = 'Press enter to continue, Ctrl+C to interrupt'
         if new_module_args['prompt']:
-            prompt = "[%s]\n%s%s:" % (self._task.get_name().strip(), new_module_args['prompt'], echo_prompt)
-        else:
-            # If no custom prompt is specified, set a default prompt
-            prompt = "[%s]\n%s%s:" % (self._task.get_name().strip(), 'Press enter to continue, Ctrl+C to interrupt', echo_prompt)
+            promptString = new_module_args['prompt']
+        prompt = "[%s]\n%s%s%s:" % (self._task.get_name().strip(), multiline_info, promptString, echo_prompt)
 
         if new_module_args['minutes'] is not None:
             seconds = new_module_args['minutes'] * 60
@@ -213,6 +218,12 @@ class ActionModule(ActionBase):
                     # unsupported/not present, use default
                     intr = b'\x03'  # value for Ctrl+C
 
+                try:
+                    veof = termios.tcgetattr(stdin_fd)[6][termios.VEOF]
+                except Exception:
+                    # unsupported/not present, use default
+                    veof = b'\x04'  # value for Ctrl+D
+
                 # get backspace sequences
                 try:
                     backspace = termios.tcgetattr(stdin_fd)[6][termios.VERASE]
@@ -255,7 +266,9 @@ class ActionModule(ActionBase):
 
                     if not seconds:
                         # read key presses and act accordingly
-                        if key_pressed in (b'\r', b'\n'):
+                        if key_pressed == veof:
+                            break
+                        elif not multiline and key_pressed in (b'\r', b'\n'):
                             clear_line(stdout)
                             break
                         elif key_pressed in backspace:
@@ -266,6 +279,8 @@ class ActionModule(ActionBase):
                                 stdout.write(result['user_input'])
                             stdout.flush()
                         else:
+                            if key_pressed in (b'\r', b'\n'):
+                                clear_line(stdout)
                             result['user_input'] += key_pressed
 
                 except KeyboardInterrupt:
@@ -300,6 +315,9 @@ class ActionModule(ActionBase):
             result['stdout'] = "Paused for %s %s" % (duration, duration_unit)
 
         result['user_input'] = to_text(result['user_input'], errors='surrogate_or_strict')
+        with open('/tmp/out.json', 'w') as fp:
+            import json
+            json.dump(result, fp)
         return result
 
     def _c_or_a(self, stdin):
