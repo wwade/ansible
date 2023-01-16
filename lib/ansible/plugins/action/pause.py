@@ -57,6 +57,9 @@ if HAS_CURSES:
     MOVE_TO_BOL = curses.tigetstr('cr') or MOVE_TO_BOL
     CLEAR_TO_EOL = curses.tigetstr('el') or CLEAR_TO_EOL
 
+MULTILINE_STATE_INPUT = "input"
+MULTILINE_STATE_NEWLINE_1 = "newline-1"
+MULTILINE_STATE_NEWLINE_2 = "newline-2"
 
 def setraw(fd, when=termios.TCSAFLUSH):
     """Put terminal into a raw mode.
@@ -121,6 +124,7 @@ class ActionModule(ActionBase):
         validation_result, new_module_args = self.validate_argument_spec(
             argument_spec={
                 'echo': {'type': 'bool', 'default': True},
+                'multiline': {'type': 'bool', 'default': False},
                 'minutes': {'type': int},  # Don't break backwards compat, allow floats, by using int callable
                 'seconds': {'type': int},  # Don't break backwards compat, allow floats, by using int callable
                 'prompt': {'type': 'str'},
@@ -134,6 +138,7 @@ class ActionModule(ActionBase):
         prompt = None
         seconds = None
         echo = new_module_args['echo']
+        multiline = new_module_args['multiline']
         echo_prompt = ''
         result.update(dict(
             changed=False,
@@ -150,11 +155,14 @@ class ActionModule(ActionBase):
         if not echo:
             echo_prompt = ' (output is hidden)'
 
+        multiline_info = ''
+        if multiline:
+            multiline_info = 'NOTE: Reading multiple lines of input. Press enter twice to finish.\n'
+
+        promptString = 'Press enter to continue, Ctrl+C to interrupt'
         if new_module_args['prompt']:
-            prompt = "[%s]\n%s%s:" % (self._task.get_name().strip(), new_module_args['prompt'], echo_prompt)
-        else:
-            # If no custom prompt is specified, set a default prompt
-            prompt = "[%s]\n%s%s:" % (self._task.get_name().strip(), 'Press enter to continue, Ctrl+C to interrupt', echo_prompt)
+            promptString = new_module_args['prompt']
+        prompt = "[%s]\n%s%s%s:" % (self._task.get_name().strip(), multiline_info, promptString, echo_prompt)
 
         if new_module_args['minutes'] is not None:
             seconds = new_module_args['minutes'] * 60
@@ -166,6 +174,7 @@ class ActionModule(ActionBase):
         # Begin the hard work!
 
         start = time.time()
+        state = MULTILINE_STATE_INPUT
         result['start'] = to_text(datetime.datetime.now())
         result['user_input'] = b''
 
@@ -256,17 +265,26 @@ class ActionModule(ActionBase):
                     if not seconds:
                         # read key presses and act accordingly
                         if key_pressed in (b'\r', b'\n'):
-                            clear_line(stdout)
-                            break
-                        elif key_pressed in backspace:
-                            # delete a character if backspace is pressed
-                            result['user_input'] = result['user_input'][:-1]
-                            clear_line(stdout)
-                            if echo:
-                                stdout.write(result['user_input'])
-                            stdout.flush()
-                        else:
                             result['user_input'] += key_pressed
+                            if not multiline or state == MULTILINE_STATE_NEWLINE_2:
+                                result['user_input'] = result['user_input'][:-1].rstrip(b"\r\n")
+                                clear_line(stdout)
+                                break
+                            elif state == MULTILINE_STATE_INPUT:
+                                state = MULTILINE_STATE_NEWLINE_1
+                            elif state == MULTILINE_STATE_NEWLINE_1:
+                                state = MULTILINE_STATE_NEWLINE_2
+                        else:
+                            state = MULTILINE_STATE_INPUT
+                            if key_pressed in backspace:
+                                # delete a character if backspace is pressed
+                                result['user_input'] = result['user_input'][:-1]
+                                clear_line(stdout)
+                                if echo:
+                                    stdout.write(result['user_input'])
+                                stdout.flush()
+                            else:
+                                result['user_input'] += key_pressed
 
                 except KeyboardInterrupt:
                     signal.alarm(0)

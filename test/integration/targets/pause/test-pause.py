@@ -290,3 +290,44 @@ pause_test.expect(r"\(ctrl\+C then 'C' = continue early, ctrl\+C then 'A' = abor
 pause_test.send('\r')
 pause_test.expect(pexpect.EOF)
 pause_test.close()
+
+
+# -- Test with multiline input -- #
+playbook = 'pause-multiline.yml'
+
+pause_test = pexpect.spawn(
+    'ansible-playbook',
+    args=[playbook] + args,
+    timeout=10,
+    env=os.environ
+)
+
+pause_test.logfile = log_buffer
+pause_test.expect('NOTE: Reading multiple lines of input. Press enter twice to finish.')
+pause_test.expect(r'Enter some text \(output is hidden\):')
+pause_test.send('first line')
+pause_test.send('\r')
+pause_test.send('second line')
+pause_test.send('\r')
+pause_test.send('third line')
+pause_test.send('\r')
+pause_test.send('\r')
+pause_test.send('fifth line')
+pause_test.send('\r')
+pause_test.send('\r')
+pause_test.send('\r')
+
+pause_test.expect('NOTE: Reading multiple lines of input. Press enter twice to finish.')
+pause_test.expect(r'Press enter to continue, Ctrl\+C to interrupt \(output is hidden\):')
+pause_test.send('from')
+pause_test.send('\r')
+pause_test.send('default')
+pause_test.send('\r')
+pause_test.send('prompt')
+pause_test.send('\r')
+pause_test.send('\r')
+pause_test.send('\r')
+
+pause_test.expect(pexpect.EOF)
+pause_test.close()
+
