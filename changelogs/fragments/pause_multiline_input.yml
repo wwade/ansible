@@ -1,2 +1,2 @@
 minor_changes:
-- "pause - add ``multiline`` option for ``ansible.builtin.pause`` to accept multiline input.
+- "pause - add ``multiline`` option for ``ansible.builtin.pause`` to accept multiline input (https://github.com/ansible/ansible/issues/TBD).

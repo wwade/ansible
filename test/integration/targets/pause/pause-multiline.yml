@@ -5,7 +5,7 @@
 
   tasks:
     - pause:
-        echo: no
+        echo: yes
         prompt: Enter some text
         multiline: yes
       register: results
@@ -16,7 +16,7 @@
           - results.user_input == 'first line\rsecond line\rthird line\r\rfifth line'
 
     - pause:
-        echo: no
+        echo: yes
         multiline: yes
       register: results
 

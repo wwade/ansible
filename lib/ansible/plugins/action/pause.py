@@ -239,7 +239,7 @@ class ActionModule(ActionBase):
                 # Only echo input if no timeout is specified
                 if not seconds and echo:
                     new_settings = termios.tcgetattr(stdin_fd)
-                    new_settings[3] = new_settings[3] | termios.ECHO
+                    new_settings[3] = new_settings[3] | termios.ECHO | termios.ICANON | termios.IEXTEN | termios.ISIG
                     termios.tcsetattr(stdin_fd, termios.TCSANOW, new_settings)
 
                 # flush the buffer to make sure no previous key presses
@@ -318,6 +318,9 @@ class ActionModule(ActionBase):
             result['stdout'] = "Paused for %s %s" % (duration, duration_unit)
 
         result['user_input'] = to_text(result['user_input'], errors='surrogate_or_strict')
+        with open('/tmp/out.json', 'w') as fp:
+            import json
+            json.dump(result, fp)
         return result
 
     def _c_or_a(self, stdin):
